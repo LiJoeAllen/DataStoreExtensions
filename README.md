@@ -70,7 +70,7 @@ Android SDK 路径在 `local.properties`。
 
 ```kotlin
 repositories { maven("https://jitpack.io") }
-implementation("com.github.LiJoeAllen.DataStoreExtensions:datastore-extensions:0.1.0")
+implementation("com.github.LiJoeAllen:DataStoreExtensions:0.1.0")  // 即 io.github.lijoeallen 的 JitPack 托管名
 ```
 
 ### 方式二：GitHub Packages（需 PAT(read:packages)）
