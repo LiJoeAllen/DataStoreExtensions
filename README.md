@@ -49,8 +49,9 @@ $env:JAVA_HOME = "<本机 JDK 17 目录>"
 adb install -r app\build\outputs\apk\debug\app-debug.apk
 ```
 
-> app 模块以 Maven 坐标 `io.github.lijoeallen:datastore-extensions`（mavenLocal）引用本仓库发布的库，
-> 而非 `project(...)`，本身就是一次发布验证：能编译即证明产物可用。
+> app 模块以 Maven 坐标 `io.github.lijoeallen:datastore-extensions` 引用本仓库发布的库（优先 mavenLocal，
+> 其次 GitHub Packages），而非 `project(...)`，本身就是一次发布验证：能编译即证明产物可用。
+> 远程消费需设置环境变量 `GITHUB_ACTOR=LiJoeAllen` 与 `GITHUB_TOKEN=<PAT(read:packages)>`。
 
 依赖下载优先走阿里云国内镜像（`settings.gradle.kts`），官方源作兜底；
 Gradle 发行版走腾讯云镜像（`gradle-wrapper.properties`）。

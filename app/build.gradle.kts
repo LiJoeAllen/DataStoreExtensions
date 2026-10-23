@@ -38,7 +38,7 @@ dependencies {
 // 在 configureEach 内懒解析，此时 persist-plugin 的任务已注册
 val pluginProject = project(":persist-plugin")
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
-    val jarTask = pluginProject.tasks.named<org.gradle.api.tasks.bundling.Jar>("jar")
+    val jarTask = pluginProject.tasks.named<Jar>("jar")
     dependsOn(jarTask)
     compilerOptions.freeCompilerArgs.add(
         jarTask.map { "-Xplugin=${it.archiveFile.get().asFile.absolutePath}" }
