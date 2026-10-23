@@ -1,0 +1,46 @@
+name: Publish datastore-extensions
+
+# 发布 datastore-extensions（common 模块）到 GitHub Packages：
+# https://docs.github.com/zh/actions/tutorials/publish-packages/publish-java-packages-with-gradle
+#
+# 触发方式（二选一）：
+# 1. 在 GitHub 上发布 Release（tag 名即版本号，如 0.1.0 或 v0.1.0，v 前缀会被去掉）
+# 2. 手动触发（workflow_dispatch），可输入 version；两者都缺省时用 build 脚本里的 0.1.0
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '发布版本号（留空则用 0.1.0）'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Publish to GitHub Packages
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_VERSION: ${{ github.event.release.tag_name || inputs.version }}
+        run: |
+          V="${RELEASE_VERSION#v}"
+          if [ -n "$V" ]; then
+            export ORG_GRADLE_PROJECT_version="$V"
+          fi
+          ./gradlew :common:publishAllPublicationsToGitHubPackagesRepository
