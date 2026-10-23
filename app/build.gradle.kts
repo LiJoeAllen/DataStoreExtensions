@@ -34,9 +34,13 @@ dependencies {
 }
 
 // ---- @K compiler plugin wiring (local module) ----
+// 路径从 jar 任务的实际输出生成（版本号会影响 jar 文件名，勿硬编码 libs/<name>.jar）；
+// 在 configureEach 内懒解析，此时 persist-plugin 的任务已注册
 val pluginProject = project(":persist-plugin")
-val pluginJarPath = pluginProject.layout.buildDirectory.file("libs/${pluginProject.name}.jar")
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
-    dependsOn(pluginProject.tasks.named("jar"))
-    compilerOptions.freeCompilerArgs.add("-Xplugin=${pluginJarPath.get().asFile.absolutePath}")
+    val jarTask = pluginProject.tasks.named<org.gradle.api.tasks.bundling.Jar>("jar")
+    dependsOn(jarTask)
+    compilerOptions.freeCompilerArgs.add(
+        jarTask.map { "-Xplugin=${it.archiveFile.get().asFile.absolutePath}" }
+    )
 }
