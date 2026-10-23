@@ -3,13 +3,20 @@ package io.github.lijoeallen.datastoreextensions
 import kotlin.reflect.KProperty
 
 /**
- * 持久化属性标记，两种用法：
- * 1. 委托：`@K var xyz by persisted(1)`
- * 2. 纯注解：`@K var abc = 100`（get/set 由编译器插件重写，见 persist-plugin 模块）
+ * 持久化属性标记，用法：
+ * 1. 委托：`@K var xyz by persisted(1)`（默认值取 persisted 的参数）
+ * 2. 纯注解：`@K var abc = 100`（默认值取属性初值）
+ * 3. 对象作用域：`@K object State { var x = 1 }`，其内所有 var 自动持久化
+ *
+ * 存储 key = [前缀-]后缀：
+ * - 后缀 = 属性的 `k`（缺省为属性名）：`@K(k = "x1") var xyz ...` → "...-x1"
+ * - 前缀 = 所在 `@K object` 的 `k`（缺省为对象简单名）：`@K(k = "demo") object State` → "demo-..."
+ * - 顶层属性无前缀，key 即后缀（向后兼容）
+ * 两种写法的 get/set 均由编译器插件在 IR 阶段重写为统一后端调用（见 persist-plugin 模块）。
  */
-@Target(AnnotationTarget.PROPERTY, AnnotationTarget.LOCAL_VARIABLE)
+@Target(AnnotationTarget.PROPERTY, AnnotationTarget.LOCAL_VARIABLE, AnnotationTarget.CLASS)
 @Retention(AnnotationRetention.BINARY)
-annotation class K
+annotation class K(val k: String = "")
 
 class PersistedProperty<T>(private val default: T) {
 

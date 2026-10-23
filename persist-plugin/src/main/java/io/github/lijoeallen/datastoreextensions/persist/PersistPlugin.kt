@@ -20,7 +20,12 @@ import org.jetbrains.kotlin.ir.builders.irString
 import org.jetbrains.kotlin.ir.declarations.IrClass
 import org.jetbrains.kotlin.ir.declarations.IrModuleFragment
 import org.jetbrains.kotlin.ir.declarations.IrProperty
+import org.jetbrains.kotlin.ir.expressions.IrCall
+import org.jetbrains.kotlin.ir.expressions.IrConst
+import org.jetbrains.kotlin.ir.expressions.IrConstructorCall
+import org.jetbrains.kotlin.ir.expressions.IrExpression
 import org.jetbrains.kotlin.ir.expressions.IrStatementOrigin
+import org.jetbrains.kotlin.ir.expressions.impl.IrConstImpl
 import org.jetbrains.kotlin.ir.expressions.impl.IrReturnImpl
 import org.jetbrains.kotlin.ir.symbols.UnsafeDuringIrConstructionAPI
 import org.jetbrains.kotlin.ir.types.IrType
@@ -54,66 +59,141 @@ class PersistPluginRegistrar : CompilerPluginRegistrar() {
 }
 
 /**
- * IR 阶段重写 @K 注解属性（无委托）的访问器：
- *   getter → return persistedGet<Type>("<属性名>", <backingField>)
- *   setter → persistedSet<Type>("<属性名>", value)
- * 已带委托（by persisted(...)）的属性保持原样，两种写法并存。
+ * IR 阶段重写 @K 属性的访问器：
+ *   getter → return persistedGet<Type>("<key>", <默认值>)
+ *   setter → persistedSet<Type>("<key>", value)
+ *
+ * key = [前缀-]后缀：
+ *   - 后缀 = 属性 @K 的 k（缺省为属性名）
+ *   - 前缀 = 所在 @K object 的 k（缺省为对象简单名）；顶层属性无前缀
+ *
+ * @K object 内所有 var 自动纳入；普通类内仅处理带 @K 的成员。
+ * 两种声明写法均重写：`var abc = 100`（默认值取 backing field）、
+ * `var xyz by persisted(1)`（默认值取 persisted(字面量) 参数）；
+ * 非 persisted() 的自定义委托保持运行时委托语义，不动。
  */
 class PersistIrGenerationExtension : IrGenerationExtension {
 
     override fun generate(moduleFragment: IrModuleFragment, pluginContext: IrPluginContext) {
         moduleFragment.files.forEach { file ->
-            file.declarations.filterIsInstance<IrProperty>().forEach { transform(it, pluginContext) }
+            file.declarations.filterIsInstance<IrProperty>().forEach { property ->
+                if (hasK(property)) transform(property, pluginContext, prefix = null)
+            }
             file.declarations.filterIsInstance<IrClass>().forEach { irClass ->
-                irClass.declarations.filterIsInstance<IrProperty>().forEach { transform(it, pluginContext) }
+                val prefix = classPrefix(irClass)
+                irClass.declarations.filterIsInstance<IrProperty>().forEach { property ->
+                    when {
+                        // @K object：全部成员自动持久化（带前缀）
+                        prefix != null -> transform(property, pluginContext, prefix)
+                        // 普通类：仅处理带 @K 的成员（无前缀）
+                        hasK(property) -> transform(property, pluginContext, null)
+                    }
+                }
             }
         }
     }
 
-    private fun transform(property: IrProperty, context: IrPluginContext) {
-        if (property.isDelegated) return
-        if (property.annotations.none { it.type.classFqName?.asString() == ANNOTATION_FQ_NAME }) return
-        val field = property.backingField ?: return
+    private fun hasK(property: IrProperty): Boolean =
+        property.annotations.any { it.isKAnnotation() }
+
+    /** @K object 的前缀：k 参数缺省时用对象简单名；非 @K 类返回 null */
+    private fun classPrefix(irClass: IrClass): String? {
+        val annotation = irClass.annotations.firstOrNull { it.isKAnnotation() } ?: return null
+        return annotation.kValue() ?: irClass.name.asString()
+    }
+
+    private fun IrConstructorCall.isKAnnotation(): Boolean =
+        type.classFqName?.asString() == ANNOTATION_FQ_NAME
+
+    /** 注解的 k 参数；缺省/空串视为未指定 */
+    private fun IrConstructorCall.kValue(): String? =
+        ((arguments.firstOrNull() as? IrConst)?.value as? String)?.takeIf { it.isNotEmpty() }
+
+    private fun transform(property: IrProperty, context: IrPluginContext, prefix: String?) {
         val getter = property.getter ?: return
         val name = property.name.asString()
         val start = property.startOffset
         val end = property.endOffset
 
-        val suffix = typeSuffix(getter.returnType, context, name) ?: return
-        val getFun = context.referenceFunctions(CallableId(FqName(BACKEND_PACKAGE), Name.identifier("persistedGet$suffix")))
+        // key = [前缀-]后缀
+        val suffix = property.annotations.firstOrNull { it.isKAnnotation() }?.kValue() ?: name
+        val key = prefix?.let { "$it-$suffix" } ?: suffix
+
+        val typeSuffix = typeSuffix(getter.returnType, context, name) ?: return
+        val getFun = context.referenceFunctions(CallableId(FqName(BACKEND_PACKAGE), Name.identifier("persistedGet$typeSuffix")))
             .firstOrNull()
         if (getFun == null) {
-            context.reportError("[@K] 找不到后端函数 persistedGet$suffix（属性 '$name'）")
+            context.reportError("[@K] 找不到后端函数 persistedGet$typeSuffix（属性 '$name'）")
             return
         }
 
-        // getter: return persistedGet<Type>("name", <field>)
         val getBuilder = IrSingleStatementBuilder(context, Scope(getter.symbol), start, end, IrStatementOrigin.INVOKE)
-        val defaultExpr = getBuilder.irGetField(
-            getter.dispatchReceiverParameter?.let { getBuilder.irGet(it) },
-            field,
-            field.type,
-        )
+
+        // 默认值：委托写法取 persisted(<字面量>) 参数；纯注解写法读 backing field
+        val defaultExpr: IrExpression = if (property.isDelegated) {
+            defaultFromDelegate(property, context, name, start, end) ?: return
+        } else {
+            val field = property.backingField ?: return
+            getBuilder.irGetField(
+                getter.dispatchReceiverParameter?.let { getBuilder.irGet(it) },
+                field,
+                field.type,
+            )
+        }
+
+        // getter: return persistedGet<Type>("<key>", <默认值>)
         val getCall = getBuilder.irCall(getFun, getter.returnType, 2, IrStatementOrigin.INVOKE)
-        getCall.arguments[0] = getBuilder.irString(name)
+        getCall.arguments[0] = getBuilder.irString(key)
         getCall.arguments[1] = defaultExpr
         getter.body = getBuilder.irBlockBody(start, end) {
             +IrReturnImpl(start, end, context.irBuiltIns.nothingType, getter.symbol, getCall)
         }
 
-        // setter: persistedSet<Type>("name", value)
+        // setter: persistedSet<Type>("<key>", value)
         val setter = property.setter ?: return
-        val setFun = context.referenceFunctions(CallableId(FqName(BACKEND_PACKAGE), Name.identifier("persistedSet$suffix")))
+        val setFun = context.referenceFunctions(CallableId(FqName(BACKEND_PACKAGE), Name.identifier("persistedSet$typeSuffix")))
             .firstOrNull()
         if (setFun == null) {
-            context.reportError("[@K] 找不到后端函数 persistedSet$suffix（属性 '$name'）")
+            context.reportError("[@K] 找不到后端函数 persistedSet$typeSuffix（属性 '$name'）")
             return
         }
         val setBuilder = IrSingleStatementBuilder(context, Scope(setter.symbol), start, end, IrStatementOrigin.INVOKE)
         val setCall = setBuilder.irCall(setFun, setter.returnType, 2, IrStatementOrigin.INVOKE)
-        setCall.arguments[0] = setBuilder.irString(name)
+        setCall.arguments[0] = setBuilder.irString(key)
         setCall.arguments[1] = setBuilder.irGet(setter.parameters.last())
         setter.body = setBuilder.irBlockBody(start, end) { +setCall }
+    }
+
+    /**
+     * 委托写法 `by persisted(<字面量>)`：提取字面量默认值（复制一份，原表达式仍留在委托字段里）。
+     * 非 persisted() 委托返回 null（保持运行时委托语义）；默认值非字面量报编译错误。
+     */
+    private fun defaultFromDelegate(
+        property: IrProperty,
+        context: IrPluginContext,
+        name: String,
+        start: Int,
+        end: Int,
+    ): IrExpression? {
+        val initCall = property.backingField?.initializer?.expression as? IrCall
+        val persistedSymbol = context.referenceFunctions(
+            CallableId(FqName(BACKEND_PACKAGE), Name.identifier("persisted"))
+        ).firstOrNull()
+        if (initCall == null || persistedSymbol == null || initCall.symbol != persistedSymbol) return null
+        val arg = initCall.arguments.filterNotNull().firstOrNull() as? IrConst
+        if (arg == null) {
+            context.reportError(
+                "[@K] 委托写法的默认值仅支持字面量（属性 '$name'），或改用纯注解写法 `var $name = <默认值>`"
+            )
+            return null
+        }
+        @Suppress("UNCHECKED_CAST")
+        return IrConstImpl(
+            start, end,
+            arg.type,
+            arg.kind,
+            arg.value,
+        )
     }
 
     private fun IrPluginContext.reportError(message: String) {

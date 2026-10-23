@@ -22,13 +22,13 @@ fun AppUi() {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            // 方式一：委托
-            Button(onClick = { xyz++ }) {
-                Text("xyz: $xyz")
+            // 方式一：委托（key = demo-xyz1，@K(k=) 覆盖后缀）
+            Button(onClick = { DemoState.xyz++ }) {
+                Text("xyz: ${DemoState.xyz}")
             }
-            // 方式二：纯注解（编译器插件重写 get/set）
-            Button(onClick = { abc++ }) {
-                Text("abc: $abc")
+            // 方式二：纯注解（key = demo-abc，对象作用域自动纳入）
+            Button(onClick = { DemoState.abc++ }) {
+                Text("abc: ${DemoState.abc}")
             }
         }
     }

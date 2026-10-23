@@ -1,15 +1,24 @@
 # DataStoreExtensions
 
 Android Compose 项目，用 **Jetpack DataStore（Preferences）** 实现 `@K` 注解持久化属性：
-声明一个属性即自动获得「读写持久化 + Compose 重组」能力，**两种写法并存**：
+声明一个属性即自动获得「读写持久化 + Compose 重组」能力。**三种用法**：
 
 ```kotlin
-@K var xyz by persisted(1)   // 写法一：属性委托
-@K var abc = 100             // 写法二：纯注解，get/set 由编译器插件重写
+@K var xyz by persisted(1)   // 写法一：属性委托（默认值取 persisted 参数）
+@K var abc = 100             // 写法二：纯注解（默认值取属性初值）
+
+@K(k = "demo")               // 写法三：对象作用域，自定义前缀
+object DemoState {
+    @K(k = "xyz1") var xyz by persisted(1)   // key = "demo-xyz1"（k 覆盖后缀）
+    var abc = 100                            // key = "demo-abc"（未标注自动纳入）
+}
 ```
 
-编译器插件在 IR 阶段把写法二的访问器改写为 `persistedGetXxx/persistedSetXxx` 后端调用，
-与写法一共享同一套内存状态表 + 存储后端。支持 Int/Long/Float/Boolean/String 五种类型。
+编译器插件在 IR 阶段把访问器统一改写为 `persistedGet*/persistedSet*` 后端调用，
+共享同一套内存状态表 + 存储后端。支持 Int/Long/Float/Boolean/String 五种类型。
+
+**存储 key = `[前缀-]后缀`**：后缀 = 属性的 `k`（缺省为属性名）；
+前缀 = 所在 `@K object` 的 `k`（缺省为对象简单名）；顶层属性无前缀（向后兼容）。
 代码使用 `io.github.lijoeallen` 命名空间。
 
 ## 模块
@@ -17,7 +26,7 @@ Android Compose 项目，用 **Jetpack DataStore（Preferences）** 实现 `@K` 
 | 模块 | 职责 |
 |---|---|
 | [datastore-extensions](./datastore-extensions) | 可复用持久化框架（发布为 `io.github.lijoeallen:datastore-extensions`）：`@K` 注解、`PersistedProperty` 委托、插件后端函数 `persistedGet*/persistedSet*`、`PersistedStore`（DataStore 后端） |
-| [persist-plugin](./persist-plugin) | Kotlin 编译器插件：IR 阶段重写 `@K` 无委托属性的 get/set |
+| [persist-plugin](./persist-plugin) | Kotlin 编译器插件：IR 阶段重写 `@K` 属性的 get/set，计算对象前缀与自定义 key |
 | [app](./app) | 演示：`App`（Application 初始化 DataStore）+ Compose UI |
 
 ## 核心设计
@@ -26,7 +35,7 @@ Android Compose 项目，用 **Jetpack DataStore（Preferences）** 实现 `@K` 
   Flow 收集器把磁盘数据同步回内存表
 - `App.onCreate` 中 `attach()` + `awaitFirstLoad()`：等首批磁盘数据落表，
   之后属性读写与 SharedPreferences 一样是同步语义
-- 支持 Int/Long/Float/Boolean/String，key 取属性名
+- 支持 Int/Long/Float/Boolean/String，key 规则见上文（`[前缀-]后缀`）
 
 ## 构建
 
