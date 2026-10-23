@@ -66,7 +66,14 @@ Android SDK 路径在 `local.properties`。
   也可在 Actions 页面手动触发（workflow_dispatch）。
 - 注意：GitHub Packages 不允许覆盖同名版本，重复发布需先删包或换版本号。
 
-消费方引用（需要 GitHub 认证，公开仓库可用 PAT）：
+### 方式一：JitPack（匿名，无需任何凭据）
+
+```kotlin
+repositories { maven("https://jitpack.io") }
+implementation("com.github.LiJoeAllen.DataStoreExtensions:datastore-extensions:0.1.1")
+```
+
+### 方式二：GitHub Packages（需 PAT(read:packages)）
 
 ```kotlin
 repositories {
@@ -74,7 +81,7 @@ repositories {
         credentials { /* GitHub 用户名 + PAT(read:packages) */ }
     }
 }
-implementation("io.github.lijoeallen:datastore-extensions:0.1.0")
+implementation("io.github.lijoeallen:datastore-extensions:0.1.1")
 ```
 
 纯注解写法（`@K var abc = 100`）需要编译器插件配合，源码在 `persist-plugin` 模块，

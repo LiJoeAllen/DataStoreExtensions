@@ -1,0 +1,8 @@
+# JitPack 构建配置（匿名消费渠道，https://jitpack.io）
+# - JDK 17：Gradle 9.8 的最低运行要求
+# - 只发布库模块：app 是演示应用，且它从 mavenLocal 消费库产物，
+#   在 JitPack 全新环境里先构建 app 会因产物未发布而随机失败
+jdk:
+  - openjdk17
+install:
+  - ./gradlew :datastore-extensions:publishToMavenLocal

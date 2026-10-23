@@ -17,7 +17,7 @@ dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
         // 本地 Maven（开发时优先消费 publishToMavenLocal 的产物）
-        mavenLocal()
+//        mavenLocal()
         // GitHub Packages 正式发布产物；需认证（PAT 勾选 read:packages）：
         //   GITHUB_ACTOR=LiJoeAllen  GITHUB_TOKEN=<PAT>
         // 未设置时匿名访问被 401 跳过，回落到上面的 mavenLocal
