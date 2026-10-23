@@ -22,7 +22,9 @@ android {
 }
 
 dependencies {
-    implementation(project(":datastore-extensions"))
+    // 以 Maven 坐标消费本仓库发布的库（发布验证）：
+    // 先 ./gradlew :datastore-extensions:publishToMavenLocal，再构建 app
+    implementation(libs.datastore.extensions)
 
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)

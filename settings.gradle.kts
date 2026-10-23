@@ -16,6 +16,8 @@ plugins {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
+        // 本地 Maven（消费 publishToMavenLocal 发布的 datastore-extensions，做发布验证）
+        mavenLocal()
         // 国内镜像（阿里云），官方源作兜底
         maven("https://maven.aliyun.com/repository/google")
         maven("https://maven.aliyun.com/repository/public")
