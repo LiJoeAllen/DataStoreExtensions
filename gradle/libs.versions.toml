@@ -17,7 +17,8 @@ compose-ui = { group = "androidx.compose.ui", name = "ui" }
 compose-material3 = { group = "androidx.compose.material3", name = "material3" }
 activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
 datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
-datastore-extensions = { module = "io.github.lijoeallen:datastore-extensions", version.ref = "datastoreExtensions" }
+# 消费 JitPack 托管的正式发布产物（匿名）；本地开发如需覆盖可 publishToMavenLocal 同坐标
+datastore-extensions = { module = "com.github.LiJoeAllen:DataStoreExtensions", version.ref = "datastoreExtensions" }
 kotlin-compiler-embeddable = { group = "org.jetbrains.kotlin", name = "kotlin-compiler-embeddable", version.ref = "kotlin" }
 
 [plugins]

@@ -44,14 +44,12 @@ AGP 9 / Gradle 9.8，构建用 JDK 17（daemon 工具链由 `gradle-daemon-jvm.p
 ```powershell
 # 指向本机 JDK 17 安装目录（Android Studio 自带的 jbr 也可以），勿写死他人机器路径
 $env:JAVA_HOME = "<本机 JDK 17 目录>"
-.\gradlew :datastore-extensions:publishToMavenLocal  # app 通过 Maven 坐标消费库，需先发布到本地
 .\gradlew :app:assembleDebug
 adb install -r app\build\outputs\apk\debug\app-debug.apk
 ```
 
-> app 模块以 Maven 坐标 `io.github.lijoeallen:datastore-extensions` 引用本仓库发布的库（优先 mavenLocal，
-> 其次 GitHub Packages），而非 `project(...)`，本身就是一次发布验证：能编译即证明产物可用。
-> 远程消费需设置环境变量 `GITHUB_ACTOR=LiJoeAllen` 与 `GITHUB_TOKEN=<PAT(read:packages)>`。
+> app 模块以 JitPack 坐标 `com.github.LiJoeAllen:DataStoreExtensions`（匿名）引用本仓库发布的正式产物，
+> 而非 `project(...)`，本身就是一次真实消费验证：能编译即证明发布产物可用，无需先发布到本地。
 
 依赖下载优先走阿里云国内镜像（`settings.gradle.kts`），官方源作兜底；
 Gradle 发行版走腾讯云镜像（`gradle-wrapper.properties`）。
