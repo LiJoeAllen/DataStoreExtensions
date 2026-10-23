@@ -1,4 +1,4 @@
-package io.github.lijoeallen.kk
+package io.github.lijoeallen.datastoreextensions
 
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf

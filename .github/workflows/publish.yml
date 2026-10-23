@@ -43,4 +43,4 @@ jobs:
           if [ -n "$V" ]; then
             export ORG_GRADLE_PROJECT_version="$V"
           fi
-          ./gradlew :common:publishAllPublicationsToGitHubPackagesRepository
+          ./gradlew :datastore-extensions:publishAllPublicationsToGitHubPackagesRepository

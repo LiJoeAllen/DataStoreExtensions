@@ -1,4 +1,7 @@
-package io.github.lijoeallen.kk
+package io.github.lijoeallen.datastoreextensions.demo
+
+import io.github.lijoeallen.datastoreextensions.K
+import io.github.lijoeallen.datastoreextensions.persisted
 
 /**
  * 演示：同一文件内两种 @K 写法并存。

@@ -1,6 +1,6 @@
 @file:OptIn(ExperimentalCompilerApi::class, UnsafeDuringIrConstructionAPI::class)
 
-package io.github.lijoeallen.kk.persist
+package io.github.lijoeallen.datastoreextensions.persist
 
 import org.jetbrains.kotlin.backend.common.extensions.IrGenerationExtension
 import org.jetbrains.kotlin.backend.common.extensions.IrPluginContext
@@ -34,10 +34,10 @@ import org.jetbrains.kotlin.name.CallableId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
 
-const val PLUGIN_ID = "io.github.lijoeallen.kk.persist"
+const val PLUGIN_ID = "io.github.lijoeallen.datastoreextensions.persist"
 
-private const val ANNOTATION_FQ_NAME = "io.github.lijoeallen.kk.K"
-private const val BACKEND_PACKAGE = "io.github.lijoeallen.kk"
+private const val ANNOTATION_FQ_NAME = "io.github.lijoeallen.datastoreextensions.K"
+private const val BACKEND_PACKAGE = "io.github.lijoeallen.datastoreextensions"
 
 class PersistCommandLineProcessor : CommandLineProcessor {
     override val pluginId: String = PLUGIN_ID

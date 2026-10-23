@@ -1,11 +1,11 @@
-package io.github.lijoeallen.kk
+package io.github.lijoeallen.datastoreextensions
 
 import kotlin.reflect.KProperty
 
 /**
  * 持久化属性标记，两种用法：
  * 1. 委托：`@K var xyz by persisted(1)`
- * 2. 纯注解：`@K var abc = 100`（get/set 由编译器插件重写，见 kk-persist-plugin 模块）
+ * 2. 纯注解：`@K var abc = 100`（get/set 由编译器插件重写，见 persist-plugin 模块）
  */
 @Target(AnnotationTarget.PROPERTY, AnnotationTarget.LOCAL_VARIABLE)
 @Retention(AnnotationRetention.BINARY)

@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "io.github.lijoeallen.kkdatastore"
+    namespace = "io.github.lijoeallen.datastoreextensions.demo"
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "io.github.lijoeallen.kkdatastore"
+        applicationId = "io.github.lijoeallen.datastoreextensions.demo"
         minSdk = 24
         targetSdk = 36
         versionCode = 1
@@ -22,7 +22,7 @@ android {
 }
 
 dependencies {
-    implementation(project(":common"))
+    implementation(project(":datastore-extensions"))
 
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
@@ -32,7 +32,7 @@ dependencies {
 }
 
 // ---- @K compiler plugin wiring (local module) ----
-val pluginProject = project(":kk-persist-plugin")
+val pluginProject = project(":persist-plugin")
 val pluginJarPath = pluginProject.layout.buildDirectory.file("libs/${pluginProject.name}.jar")
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
     dependsOn(pluginProject.tasks.named("jar"))

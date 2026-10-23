@@ -16,8 +16,8 @@ Android Compose 项目，用 **Jetpack DataStore（Preferences）** 实现 `@K` 
 
 | 模块 | 职责 |
 |---|---|
-| [common](./common) | 可复用持久化框架（发布为 `io.github.lijoeallen:datastore-extensions`）：`@K` 注解、`PersistedProperty` 委托、插件后端函数 `persistedGet*/persistedSet*`、`PersistedStore`（DataStore 后端） |
-| [kk-persist-plugin](./kk-persist-plugin) | Kotlin 编译器插件：IR 阶段重写 `@K` 无委托属性的 get/set |
+| [datastore-extensions](./datastore-extensions) | 可复用持久化框架（发布为 `io.github.lijoeallen:datastore-extensions`）：`@K` 注解、`PersistedProperty` 委托、插件后端函数 `persistedGet*/persistedSet*`、`PersistedStore`（DataStore 后端） |
+| [persist-plugin](./persist-plugin) | Kotlin 编译器插件：IR 阶段重写 `@K` 无委托属性的 get/set |
 | [app](./app) | 演示：`App`（Application 初始化 DataStore）+ Compose UI |
 
 ## 核心设计
@@ -45,7 +45,7 @@ Android SDK 路径在 `local.properties`。
 
 ## 发布 datastore-extensions
 
-`common` 模块经 [vanniktech](https://github.com/vanniktech/gradle-maven-publish-plugin) 插件
+`datastore-extensions` 模块经 [vanniktech](https://github.com/vanniktech/gradle-maven-publish-plugin) 插件
 发布到 GitHub Packages，工作流见 [.github/workflows/publish.yml](.github/workflows/publish.yml)：
 
 - **在 GitHub 创建 Release**（tag 名即版本号，如 `0.1.0`，`v` 前缀自动去掉）即可触发；
@@ -63,14 +63,14 @@ repositories {
 implementation("io.github.lijoeallen:datastore-extensions:0.1.0")
 ```
 
-纯注解写法（`@K var abc = 100`）需要编译器插件配合，源码在 `kk-persist-plugin` 模块，
-可作为本地模块接入（`-Xplugin=`），参见 `common/build.gradle.kts` 的接线方式。
+纯注解写法（`@K var abc = 100`）需要编译器插件配合，源码在 `persist-plugin` 模块，
+可作为本地模块接入（`-Xplugin=`），参见 `datastore-extensions/build.gradle.kts` 的接线方式。
 
 ## 修改插件后
 
-插件源码改动需重新出 jar（Gradle 的 `:kk-persist-plugin:jar` 会自动被
-app/common 的编译任务依赖，正常构建即可）：
+插件源码改动需重新出 jar（Gradle 的 `:persist-plugin:jar` 会自动被
+app/datastore-extensions 的编译任务依赖，正常构建即可）：
 
 ```powershell
-.\gradlew :kk-persist-plugin:jar
+.\gradlew :persist-plugin:jar
 ```

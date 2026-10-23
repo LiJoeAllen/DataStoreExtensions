@@ -1,4 +1,4 @@
-package io.github.lijoeallen.kkdatastore
+package io.github.lijoeallen.datastoreextensions.demo
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity

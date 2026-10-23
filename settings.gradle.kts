@@ -27,5 +27,5 @@ dependencyResolutionManagement {
 rootProject.name = "DataStoreExtensions"
 
 include(":app")
-include(":common")
-include(":kk-persist-plugin")
+include(":datastore-extensions")
+include(":persist-plugin")

@@ -10,7 +10,7 @@ group = "io.github.lijoeallen"
 version = providers.gradleProperty("version").getOrElse("0.1.0")
 
 android {
-    namespace = "io.github.lijoeallen.kk"
+    namespace = "io.github.lijoeallen.datastoreextensions"
     compileSdk = 37
 
     defaultConfig {
@@ -77,7 +77,7 @@ configure<PublishingExtension> {
 }
 
 // ---- @K compiler plugin wiring (local module) ----
-val pluginProject = project(":kk-persist-plugin")
+val pluginProject = project(":persist-plugin")
 val pluginJarPath = pluginProject.layout.buildDirectory.file("libs/${pluginProject.name}.jar")
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
     dependsOn(pluginProject.tasks.named("jar"))

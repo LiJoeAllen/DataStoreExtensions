@@ -1,4 +1,4 @@
-package io.github.lijoeallen.kkdatastore
+package io.github.lijoeallen.datastoreextensions.demo
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -11,8 +11,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import io.github.lijoeallen.kk.abc
-import io.github.lijoeallen.kk.xyz
 
 @Composable
 fun AppUi() {
