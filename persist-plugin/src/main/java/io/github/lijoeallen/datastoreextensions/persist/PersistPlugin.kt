@@ -223,12 +223,13 @@ class PersistIrGenerationExtension : IrGenerationExtension {
         messageCollector.report(CompilerMessageSeverity.ERROR, message)
     }
 
+    /** 后缀直接取 Kotlin 类型 simpleName，与库的后端函数名 persistedGet<Int/Long/...> 一一对应 */
     private fun typeSuffix(type: IrType, context: IrPluginContext, name: String): String? = when {
-        type.isInt() -> "Int"
-        type.isLong() -> "Long"
-        type.isFloat() -> "Float"
-        type.isBoolean() -> "Boolean"
-        type.isString() -> "String"
+        type.isInt() -> Int::class.simpleName
+        type.isLong() -> Long::class.simpleName
+        type.isFloat() -> Float::class.simpleName
+        type.isBoolean() -> Boolean::class.simpleName
+        type.isString() -> String::class.simpleName
         else -> {
             context.reportError("[@K] 不支持的属性类型 '$name'：仅支持 Int/Long/Float/Boolean/String")
             null
