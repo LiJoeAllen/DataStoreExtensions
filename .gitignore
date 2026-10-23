@@ -11,3 +11,4 @@ local.properties
 *.hprof
 /.v2c/
 /.video_agent/
+.kotlin/
