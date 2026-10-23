@@ -11,7 +11,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.runBlocking
 
-private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "kkdatastore_prefs")
+/** DataStore 持久化文件名（存储契约，改名即丢数据） */
+private const val DATASTORE_NAME = "kkdatastore_prefs"
+
+private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = DATASTORE_NAME)
 
 class App : Application() {
 

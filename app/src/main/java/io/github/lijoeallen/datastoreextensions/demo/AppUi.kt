@@ -12,15 +12,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
+private val ScreenPadding = 16.dp
+private val ItemSpacing = 8.dp
+
 @Composable
 fun AppUi() {
     MaterialTheme {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp),
+                .padding(ScreenPadding),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(ItemSpacing),
         ) {
             // 方式一：委托 + 自定义后缀（key = demo-xyz1）
             Button(onClick = { DemoState.xyz++ }) {

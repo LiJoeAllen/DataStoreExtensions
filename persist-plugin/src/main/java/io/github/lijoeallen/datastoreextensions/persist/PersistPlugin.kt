@@ -45,6 +45,14 @@ const val PLUGIN_ID = "io.github.lijoeallen.datastoreextensions.persist"
 private const val ANNOTATION_FQ_NAME = "io.github.lijoeallen.datastoreextensions.K"
 private const val BACKEND_PACKAGE = "io.github.lijoeallen.datastoreextensions"
 
+// key 前后缀之间的分隔符（存储契约的一部分，与库文档一致）
+private const val KEY_SEPARATOR = "-"
+
+// 库的后端函数命名（与 Persisted.kt 中的函数一一对应，勿改名）
+private const val GETTER_FN_PREFIX = "persistedGet"
+private const val SETTER_FN_PREFIX = "persistedSet"
+private const val PERSISTED_FN_NAME = "persisted"
+
 /**
  * 按 CallableId 查找后端函数符号（位于依赖模块 datastore-extensions 中）。
  *
@@ -129,12 +137,12 @@ class PersistIrGenerationExtension : IrGenerationExtension {
 
         // key = [前缀-]后缀
         val suffix = property.annotations.firstOrNull { it.isKAnnotation() }?.kValue() ?: name
-        val key = prefix?.let { "$it-$suffix" } ?: suffix
+        val key = prefix?.let { "$it$KEY_SEPARATOR$suffix" } ?: suffix
 
         val typeSuffix = typeSuffix(getter.returnType, context, name) ?: return
-        val getFun = context.findBackendFunction("persistedGet$typeSuffix")
+        val getFun = context.findBackendFunction(GETTER_FN_PREFIX + typeSuffix)
         if (getFun == null) {
-            context.reportError("[@K] 找不到后端函数 persistedGet$typeSuffix（属性 '$name'）")
+            context.reportError("[@K] 找不到后端函数 $GETTER_FN_PREFIX$typeSuffix（属性 '$name'）")
             return
         }
 
@@ -162,9 +170,9 @@ class PersistIrGenerationExtension : IrGenerationExtension {
 
         // setter: persistedSet<Type>("<key>", value)
         val setter = property.setter ?: return
-        val setFun = context.findBackendFunction("persistedSet$typeSuffix")
+        val setFun = context.findBackendFunction(SETTER_FN_PREFIX + typeSuffix)
         if (setFun == null) {
-            context.reportError("[@K] 找不到后端函数 persistedSet$typeSuffix（属性 '$name'）")
+            context.reportError("[@K] 找不到后端函数 $SETTER_FN_PREFIX$typeSuffix（属性 '$name'）")
             return
         }
         val setBuilder = IrSingleStatementBuilder(context, Scope(setter.symbol), start, end, IrStatementOrigin.INVOKE)
@@ -186,7 +194,7 @@ class PersistIrGenerationExtension : IrGenerationExtension {
         end: Int,
     ): IrExpression? {
         val initCall = property.backingField?.initializer?.expression as? IrCall
-        val persistedSymbol = context.findBackendFunction("persisted")
+        val persistedSymbol = context.findBackendFunction(PERSISTED_FN_NAME)
         if (initCall == null || persistedSymbol == null || initCall.symbol != persistedSymbol) return null
         val arg = initCall.arguments.filterNotNull().firstOrNull() as? IrConst
         if (arg == null) {
