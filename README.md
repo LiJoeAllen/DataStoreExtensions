@@ -70,7 +70,7 @@ Android SDK 路径在 `local.properties`。
 
 ```kotlin
 repositories { maven("https://jitpack.io") }
-implementation("com.github.LiJoeAllen.DataStoreExtensions:datastore-extensions:0.1.1")
+implementation("com.github.LiJoeAllen.DataStoreExtensions:datastore-extensions:0.1.0")
 ```
 
 ### 方式二：GitHub Packages（需 PAT(read:packages)）
@@ -81,7 +81,7 @@ repositories {
         credentials { /* GitHub 用户名 + PAT(read:packages) */ }
     }
 }
-implementation("io.github.lijoeallen:datastore-extensions:0.1.1")
+implementation("io.github.lijoeallen:datastore-extensions:0.1.0")
 ```
 
 纯注解写法（`@K var abc = 100`）需要编译器插件配合，源码在 `persist-plugin` 模块，
