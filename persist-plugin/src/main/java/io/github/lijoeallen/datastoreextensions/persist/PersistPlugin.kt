@@ -27,6 +27,7 @@ import org.jetbrains.kotlin.ir.expressions.IrExpression
 import org.jetbrains.kotlin.ir.expressions.IrStatementOrigin
 import org.jetbrains.kotlin.ir.expressions.impl.IrConstImpl
 import org.jetbrains.kotlin.ir.expressions.impl.IrReturnImpl
+import org.jetbrains.kotlin.ir.symbols.IrSimpleFunctionSymbol
 import org.jetbrains.kotlin.ir.symbols.UnsafeDuringIrConstructionAPI
 import org.jetbrains.kotlin.ir.types.IrType
 import org.jetbrains.kotlin.ir.types.classFqName
@@ -34,7 +35,7 @@ import org.jetbrains.kotlin.ir.types.isBoolean
 import org.jetbrains.kotlin.ir.types.isFloat
 import org.jetbrains.kotlin.ir.types.isInt
 import org.jetbrains.kotlin.ir.types.isLong
-import org.jetbrains.kotlin.ir.types.isString
+import org.jetbrains.kotlin.ir.types.isString 
 import org.jetbrains.kotlin.name.CallableId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
@@ -43,6 +44,17 @@ const val PLUGIN_ID = "io.github.lijoeallen.datastoreextensions.persist"
 
 private const val ANNOTATION_FQ_NAME = "io.github.lijoeallen.datastoreextensions.K"
 private const val BACKEND_PACKAGE = "io.github.lijoeallen.datastoreextensions"
+
+/**
+ * 按 CallableId 查找后端函数符号（位于依赖模块 datastore-extensions 中）。
+ *
+ * Kotlin 2.4 弃用了 referenceFunctions，建议的替代 finderForBuiltins()/finderForSource()
+ * 分别只覆盖内置声明与本模块源码，均不含跨模块（依赖库）符号，暂无官方替代 API，
+ * 先抑制弃用警告，待官方提供跨模块 finder 后迁移。
+ */
+@Suppress("DEPRECATION")
+private fun IrPluginContext.findBackendFunction(name: String): IrSimpleFunctionSymbol? =
+    referenceFunctions(CallableId(FqName(BACKEND_PACKAGE), Name.identifier(name))).firstOrNull()
 
 class PersistCommandLineProcessor : CommandLineProcessor {
     override val pluginId: String = PLUGIN_ID
@@ -120,8 +132,7 @@ class PersistIrGenerationExtension : IrGenerationExtension {
         val key = prefix?.let { "$it-$suffix" } ?: suffix
 
         val typeSuffix = typeSuffix(getter.returnType, context, name) ?: return
-        val getFun = context.referenceFunctions(CallableId(FqName(BACKEND_PACKAGE), Name.identifier("persistedGet$typeSuffix")))
-            .firstOrNull()
+        val getFun = context.findBackendFunction("persistedGet$typeSuffix")
         if (getFun == null) {
             context.reportError("[@K] 找不到后端函数 persistedGet$typeSuffix（属性 '$name'）")
             return
@@ -151,8 +162,7 @@ class PersistIrGenerationExtension : IrGenerationExtension {
 
         // setter: persistedSet<Type>("<key>", value)
         val setter = property.setter ?: return
-        val setFun = context.referenceFunctions(CallableId(FqName(BACKEND_PACKAGE), Name.identifier("persistedSet$typeSuffix")))
-            .firstOrNull()
+        val setFun = context.findBackendFunction("persistedSet$typeSuffix")
         if (setFun == null) {
             context.reportError("[@K] 找不到后端函数 persistedSet$typeSuffix（属性 '$name'）")
             return
@@ -176,9 +186,7 @@ class PersistIrGenerationExtension : IrGenerationExtension {
         end: Int,
     ): IrExpression? {
         val initCall = property.backingField?.initializer?.expression as? IrCall
-        val persistedSymbol = context.referenceFunctions(
-            CallableId(FqName(BACKEND_PACKAGE), Name.identifier("persisted"))
-        ).firstOrNull()
+        val persistedSymbol = context.findBackendFunction("persisted")
         if (initCall == null || persistedSymbol == null || initCall.symbol != persistedSymbol) return null
         val arg = initCall.arguments.filterNotNull().firstOrNull() as? IrConst
         if (arg == null) {
@@ -196,6 +204,13 @@ class PersistIrGenerationExtension : IrGenerationExtension {
         )
     }
 
+    /**
+     * messageCollector 在 Kotlin 2.4 被弃用，建议迁移 diagnosticReporter；但其
+     * KtSourcelessDiagnosticFactory 需要填充渲染 Map（put 为 internal，第三方无法调用），
+     * 空 Map 在报错时会抛 IllegalStateException（实测）。故保留 messageCollector 并抑制弃用，
+     * 待官方开放 sourceless ERROR 的公开 DSL 后迁移。
+     */
+    @Suppress("DEPRECATION")
     private fun IrPluginContext.reportError(message: String) {
         messageCollector.report(CompilerMessageSeverity.ERROR, message)
     }
