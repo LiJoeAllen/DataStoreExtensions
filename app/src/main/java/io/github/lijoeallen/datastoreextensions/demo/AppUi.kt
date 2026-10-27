@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import io.github.lijoeallen.datastoreextensions.PersistedStore
 
 private val ScreenPadding = 16.dp
 private val ItemSpacing = 8.dp
@@ -40,6 +41,10 @@ fun AppUi() {
             // prefix 缺省的对象：前缀回退对象名（key = Counter-count）
             Button(onClick = { Counter.count++ }) {
                 Text("count: ${Counter.count}")
+            }
+            // 恢复出厂：全部属性内存即时回默认值，磁盘异步删除
+            Button(onClick = { PersistedStore.resetAll() }) {
+                Text("reset all")
             }
         }
     }

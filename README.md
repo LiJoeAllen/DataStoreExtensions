@@ -32,19 +32,22 @@ object DemoState {
 
 ```kotlin
 repositories { maven("https://jitpack.io") }
-implementation("com.github.LiJoeAllen:DataStoreExtensions:0.2.0")
+implementation("com.github.LiJoeAllen:DataStoreExtensions:0.2.1")
 ```
 
 ### 2. 接入编译器插件
 
 `@Persisted` 的改写由编译器插件完成（纯注解/对象作用域没有插件**不会持久化**，会报编译错提示）。
-插件的 Kotlin 版本需与你的 Kotlin Gradle 插件版本一致（当前基于 Kotlin 2.4）：
+编译器插件与编译器 ABI 强绑定，**需选与你的 Kotlin 版本匹配的插件 tag**（兼容表见「发布」一节；
+本项目默认构建基于 Kotlin 2.4）：
 
 ```kotlin
 // build.gradle.kts
 val persistPlugin = configurations.create("persistPlugin") { isTransitive = false }
 dependencies {
-    persistPlugin("com.github.LiJoeAllen.DataStoreExtensions:persist-plugin:0.2.0")
+    persistPlugin("com.github.LiJoeAllen.DataStoreExtensions:persist-plugin:0.2.1")
+    // Kotlin 2.3.x 项目请用变体 tag：
+    // persistPlugin("com.github.LiJoeAllen.DataStoreExtensions:persist-plugin:0.2.1-k2.3.21")
 }
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
     compilerOptions.freeCompilerArgs.add(
@@ -57,7 +60,9 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
 
 ### 3. 初始化（Application）
 
-未调用 `attach()` 就访问属性会抛 `IllegalStateException`（快速失败，不静默丢数据）：
+未调用 `attach()` 就访问属性会抛 `IllegalStateException`（快速失败，不静默丢数据）。
+嵌入式/慢速存储场景建议传入 `onCorruption` 回调启用**降级模式**：磁盘损坏时不再抛出，
+库以默认值继续服务读（`isDegraded = true`），由业务方决定重建文件：
 
 ```kotlin
 // 顶层声明 DataStore 单例
@@ -68,9 +73,14 @@ class App : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        PersistedStore.attach(appDataStore, appScope)
-        // 等首批磁盘数据落表，之后属性读写是同步语义
-        runBlocking { PersistedStore.awaitFirstLoad() }
+        PersistedStore.attach(appDataStore, appScope)          // 默认 fail-fast
+        // PersistedStore.attach(appDataStore, appScope) { t ->   // 降级模式（可选）
+        //     Log.e("App", "存储损坏，已降级为默认值", t)
+        // }
+        // 等首批磁盘数据落表，之后属性读写是同步语义。
+        // 主线程 runBlocking 仅适合小文件+快存储；嵌入式冷启动建议放后台协程，
+        // 配合 PersistedStore.firstLoadDone 做启动门闩：
+        appScope.launch { PersistedStore.awaitFirstLoad() }
     }
 }
 ```
@@ -90,12 +100,40 @@ class App : Application() {
 - 对象段 = 对象的 `key` 参数（缺省为对象简单名），多级嵌套时逐层追加
 - `@Persisted object` 是持久化作用域：作用域内所有 var 与嵌套对象自动纳入；
   作用域外（顶层/普通类）仅带 @Persisted 的成员持久化，无作用域段
+- **绝对 key**：属性 key 以 `/` 开头时忽略全部作用域段（如 `@Persisted("/show_images")`），
+  用于存量 flat key 收拢进 object 时数据零迁移
+
+**重置（恢复出厂）**：
+
+```kotlin
+PersistedStore.reset("demo-xyz1")                 // 单 key 回默认值
+PersistedStore.reset { it.startsWith("demo-") }   // 按谓词（如作用域前缀）
+PersistedStore.resetAll()                         // 全库恢复出厂
+```
+
+重置是同步语义：内存立即回声明默认值，磁盘异步删除，Flow 回灌会跳过待删 key
+直到磁盘确认——不存在「磁盘已删、内存仍旧值」的窗口。
 
 **类型与失败行为（全部 fail-fast，无静默丢弃）**：
 
 - 仅支持 Int/Long/Float/Boolean/String；其他类型编译期报错（插件），
   纯委托运行时构造报错（`persisted(1.0)`）
 - 存储文件名是存储契约，改名即丢数据
+
+## 从手写 DataStore / SharedPreferences 迁移
+
+- **同名文件复用**：`preferencesDataStore(name = ...)` 同名委托是进程内单例，迁移期新旧入口可共存读同一文件
+- **存量 flat key 收拢进 object**：属性用绝对 key（`/` 开头）忽略作用域段，key 与存量完全一致，零迁移：
+
+  ```kotlin
+  @Persisted object Settings {
+      @Persisted("/show_images") var showImages = true    // key = "show_images"
+      @Persisted("/timer_switch") var timerSwitch = true  // key = "timer_switch"
+  }
+  ```
+
+- 新增字段不必带 `/`，走正常作用域段即可，存量数据原地不动
+- 注意存储 key 的可用字符受 DataStore 约束（字母/数字/`_`/`-`），段内避免其他符号
 
 ## 模块
 
@@ -137,16 +175,25 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
 
 ## 发布
 
-发布渠道只有 **JitPack**：**在 GitHub 创建 Release**（tag 名即版本号，如 `0.2.0`）即可，
+发布渠道只有 **JitPack**：**在 GitHub 创建 Release**（tag 名即版本号，如 `0.2.1`）即可，
 无需任何 CI 配置——JitPack 在首次请求该版本时自动构建（见 `jitpack.yml`：
 双模块 publishToMavenLocal，版本取 tag）。版本不可变，重新发布需换版本号。
 
 消费坐标（匿名）：
 
 ```kotlin
-implementation("com.github.LiJoeAllen:DataStoreExtensions:0.2.0")                      // AAR
-classpath / 配置依赖("com.github.LiJoeAllen.DataStoreExtensions:persist-plugin:0.2.0") // 插件（多模块坐标）
+implementation("com.github.LiJoeAllen:DataStoreExtensions:0.2.1")                      // AAR
+classpath / 配置依赖("com.github.LiJoeAllen.DataStoreExtensions:persist-plugin:0.2.1") // 插件（多模块坐标）
 ```
+
+### 插件与 Kotlin 版本兼容表
+
+编译器插件与编译器 ABI 强绑定，请按项目 Kotlin 版本选 tag（运行时 AAR 无此约束）：
+
+| tag | 构建用 Kotlin | 适用项目 Kotlin |
+|---|---|---|
+| `0.2.1` | 2.4.21 | 2.4.x |
+| `0.2.1-k2.3.21` | 2.3.21 | 2.3.x |
 
 ## 修改插件后
 

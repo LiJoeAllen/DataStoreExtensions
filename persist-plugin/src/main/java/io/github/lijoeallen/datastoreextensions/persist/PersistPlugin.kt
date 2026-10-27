@@ -89,6 +89,7 @@ class PersistPluginRegistrar : CompilerPluginRegistrar() {
  * key = 各层 key 段以 "-" 连接（多级作用域逐层追加）：
  *   - 属性段 = 属性 @Persisted 的 key（缺省为属性名）
  *   - 对象段 = 对象 @Persisted 的 key（缺省为对象简单名），嵌套时拼接外层作用域
+ *   - 属性 key 以 "/" 开头为绝对 key：忽略全部作用域段（存量 flat key 收拢零迁移）
  *
  * @Persisted object 是持久化作用域：作用域内所有 var 与嵌套对象自动纳入；
  * 作用域外（顶层/普通类）仅带 @Persisted 的成员持久化（无作用域前缀）。
@@ -164,10 +165,24 @@ class PersistIrGenerationExtension : IrGenerationExtension {
         val start = property.startOffset
         val end = property.endOffset
 
-        // key = 各层 key 段拼接：作用域段（可多层）+ 属性段
+        // key = 各层 key 段拼接：作用域段（可多层）+ 属性段；
+        // 属性段以 "/" 开头为绝对 key：忽略全部作用域段，用于存量 flat key 收拢与迁移
         val annotation = property.annotations.firstOrNull { it.isPersistedAnnotation() }
-        val segment = annotation?.paramValue(PARAM_KEY)?.takeIf { it.isNotEmpty() } ?: name
-        val key = scope?.let { "$it$KEY_SEPARATOR$segment" } ?: segment
+        val raw = annotation?.paramValue(PARAM_KEY)?.takeIf { it.isNotEmpty() }
+        val key = when {
+            raw != null && raw.startsWith("/") -> {
+                val absolute = raw.substring(1)
+                if (absolute.isEmpty()) {
+                    context.reportError("[@Persisted] 绝对 key（\"/\" 开头）不能为空（属性 '$name'）")
+                    return
+                }
+                absolute
+            }
+            else -> {
+                val segment = raw ?: name
+                scope?.let { "$it$KEY_SEPARATOR$segment" } ?: segment
+            }
+        }
 
         val typeSuffix = typeSuffix(getter.returnType, context, name) ?: return
         val getFun = context.findBackendFunction(GETTER_FN_PREFIX + typeSuffix)
