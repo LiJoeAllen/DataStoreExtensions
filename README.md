@@ -35,9 +35,6 @@ repositories { maven("https://jitpack.io") }
 implementation("com.github.LiJoeAllen:DataStoreExtensions:0.2.0")
 ```
 
-> GitHub Packages 的 Maven 读取强制鉴权（公开仓库也需 PAT），不适合作为消费渠道，
-> 仅作发布备份（见「发布」）。编译器插件坐标见「发布」一节的多模块写法。
-
 ### 2. 接入编译器插件
 
 `@Persisted` 的改写由编译器插件完成（纯注解/对象作用域没有插件**不会持久化**，会报编译错提示）。
@@ -47,8 +44,7 @@ implementation("com.github.LiJoeAllen:DataStoreExtensions:0.2.0")
 // build.gradle.kts
 val persistPlugin = configurations.create("persistPlugin") { isTransitive = false }
 dependencies {
-    persistPlugin("io.github.lijoeallen:persist-plugin:0.2.0")
-    // JitPack 渠道则为 "com.github.LiJoeAllen.DataStoreExtensions:persist-plugin:0.2.0"
+    persistPlugin("com.github.LiJoeAllen.DataStoreExtensions:persist-plugin:0.2.0")
 }
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
     compilerOptions.freeCompilerArgs.add(
@@ -103,10 +99,10 @@ class App : Application() {
 
 ## 模块
 
-| 模块 | 发布坐标 | 职责 |
+| 模块 | JitPack 坐标 | 职责 |
 |---|---|---|
-| [datastore-extensions](./datastore-extensions) | `io.github.lijoeallen:datastore-extensions` | 可复用持久化框架：`@Persisted` 注解、`PersistedProperty` 委托、插件后端函数、`PersistedStore`（DataStore 后端） |
-| [persist-plugin](./persist-plugin) | `io.github.lijoeallen:persist-plugin` | Kotlin 编译器插件：IR 阶段重写 `@Persisted` 属性的 get/set，计算对象前缀与自定义 key |
+| [datastore-extensions](./datastore-extensions) | `com.github.LiJoeAllen:DataStoreExtensions` | 可复用持久化框架：`@Persisted` 注解、`PersistedProperty` 委托、插件后端函数、`PersistedStore`（DataStore 后端） |
+| [persist-plugin](./persist-plugin) | `com.github.LiJoeAllen.DataStoreExtensions:persist-plugin` | Kotlin 编译器插件：IR 阶段重写 `@Persisted` 属性的 get/set，计算作用域段与自定义 key |
 | [app](./app) | 不发布 | 演示：`App`（初始化）+ Compose UI |
 | [build-logic](./build-logic) | 不发布 | 构建约定（convention plugin）：编译器插件接线、Maven 发布公共配置 |
 
@@ -141,13 +137,11 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
 
 ## 发布
 
-[.github/workflows/publish.yml](.github/workflows/publish.yml) 一次发布两个库模块到 GitHub Packages：
+发布渠道只有 **JitPack**：**在 GitHub 创建 Release**（tag 名即版本号，如 `0.2.0`）即可，
+无需任何 CI 配置——JitPack 在首次请求该版本时自动构建（见 `jitpack.yml`：
+双模块 publishToMavenLocal，版本取 tag）。版本不可变，重新发布需换版本号。
 
-- **在 GitHub 创建 Release**（tag 名即版本号，如 `0.2.0`，`v` 前缀自动去掉）即可触发；
-  也可在 Actions 页面手动触发（workflow_dispatch）。
-- 注意：GitHub Packages 不允许覆盖同名版本，重复发布需先删包或换版本号。
-
-JitPack 在 tag 构建时同时发布两个模块（见 `jitpack.yml`，版本取 tag），消费坐标：
+消费坐标（匿名）：
 
 ```kotlin
 implementation("com.github.LiJoeAllen:DataStoreExtensions:0.2.0")                      // AAR

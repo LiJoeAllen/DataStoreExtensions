@@ -1,10 +1,10 @@
 import com.vanniktech.maven.publish.MavenPublishBaseExtension
-import org.gradle.api.publish.PublishingExtension
 
 /**
  * Maven 发布约定：组名/版本（可被 -Pversion= 或 ORG_GRADLE_PROJECT_version= 覆盖，
- * CI 用 release tag、JitPack 用 VERSION 环境变量）、公共 POM 字段、GitHub Packages 发布仓库。
- * 各模块只声明自己的 coordinates 与 pom name/description。
+ * JitPack 用 VERSION 环境变量）、公共 POM 字段。
+ * 发布渠道为 JitPack（构建 tag 时自动 publishToMavenLocal），各模块只声明
+ * 自己的 coordinates 与 pom name/description。
  */
 group = "io.github.lijoeallen"
 version = providers.gradleProperty("version").getOrElse("0.2.0")
@@ -35,17 +35,3 @@ extensions.configure<MavenPublishBaseExtension> {
     }
 }
 
-// GitHub Packages 发布仓库；凭证由 CI 的 GITHUB_ACTOR/GITHUB_TOKEN 环境变量提供
-// https://docs.github.com/zh/actions/tutorials/publish-packages/publish-java-packages-with-gradle
-extensions.configure<PublishingExtension> {
-    repositories {
-        maven {
-            name = "GitHubPackages"
-            url = uri("https://maven.pkg.github.com/LiJoeAllen/DataStoreExtensions")
-            credentials {
-                username = System.getenv("GITHUB_ACTOR")
-                password = System.getenv("GITHUB_TOKEN")
-            }
-        }
-    }
-}

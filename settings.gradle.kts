@@ -18,7 +18,7 @@ plugins {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
-        // JitPack：消费正式发布产物的唯一渠道（匿名）；GitHub Packages 读取强制鉴权，仅作发布备份
+        // JitPack：消费正式发布产物的唯一渠道（匿名）
         maven("https://jitpack.io")
         // app 平时以 project(":datastore-extensions") 消费仓库内模块（默认），
         // 发布验证时以 -PconsumeRemote 切到 JitPack 坐标，不走 mavenLocal
