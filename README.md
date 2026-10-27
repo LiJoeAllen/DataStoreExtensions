@@ -35,16 +35,8 @@ repositories { maven("https://jitpack.io") }
 implementation("com.github.LiJoeAllen:DataStoreExtensions:0.2.0")
 ```
 
-**GitHub Packages（需 PAT(read:packages)）**：
-
-```kotlin
-repositories {
-    maven("https://maven.pkg.github.com/LiJoeAllen/DataStoreExtensions") {
-        credentials { /* GitHub 用户名 + PAT(read:packages) */ }
-    }
-}
-implementation("io.github.lijoeallen:datastore-extensions:0.2.0")
-```
+> GitHub Packages 的 Maven 读取强制鉴权（公开仓库也需 PAT），不适合作为消费渠道，
+> 仅作发布备份（见「发布」）。编译器插件坐标见「发布」一节的多模块写法。
 
 ### 2. 接入编译器插件
 
