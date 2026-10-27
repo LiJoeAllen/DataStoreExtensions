@@ -14,6 +14,15 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlin.reflect.KClass
+import kotlin.reflect.KProperty0
+
+/** 两个声明映射到同一存储 key（默认值不同）时抛出。编译期查重覆盖同模块，跨模块场景由本异常兜底 */
+class PersistedKeyConflictException(key: String, first: Any?, second: Any?) :
+    IllegalStateException(
+        "存储 key 冲突：'$key' 同时被默认值 $first 与 $second 的两个声明使用；" +
+            "请检查 @Persisted key/作用域（顶层不同文件、不同模块间无法编译期查重）"
+    )
 
 /**
  * @Persisted 持久化属性的 DataStore 后端。
@@ -32,8 +41,10 @@ object PersistedStore {
     // key = 完整存储 key。保证委托/插件生成的访问器在每次重组后仍持有同一 MutableState 实例。
     private val states = mutableMapOf<String, MutableState<Any?>>()
 
-    // key → 声明处默认值（首次访问时登记），reset 以此回默认值（issue #3）
+    // key → 声明处默认值（首次访问时登记），reset 以此回默认值（issue #3）。
+    // 经 write 路径先于 getter 创建的状态用 unsetDefault 占位，首次 getter 访问时补登记真实默认值
     private val defaults = mutableMapOf<String, Any?>()
+    private val unsetDefault = Any()
 
     // 已请求删除、等待磁盘确认的 key：Flow 回灌时跳过，避免旧值短暂回灌
     private val pendingRemovals = mutableSetOf<String>()
@@ -140,26 +151,48 @@ object PersistedStore {
         if (keys.isNotEmpty()) reset(*keys.toTypedArray())
     }
 
+    /**
+     * 类型安全重置（object 属性引用）：`reset(TimerState::switch)`。
+     * 调用点由 persist-plugin 在编译期改写为顶层 [PersistedBackend.resetKey]（key 字面量内联，
+     * R8 安全）；引用须内联写在调用处。未接插件时本方法抛错
+     */
+    fun reset(ref: KProperty0<*>): Unit = failRequirePlugin("reset(属性引用)")
+
+    /**
+     * 类型安全作用域重置：`resetScope(TimerState::class)`。
+     * 调用点由 persist-plugin 改写为顶层 [PersistedBackend.resetScopeKey]；未接插件时抛错
+     */
+    fun resetScope(scope: KClass<*>): Unit = failRequirePlugin("resetScope(类引用)")
+
+    private fun failRequirePlugin(api: String): Nothing = throw UnsupportedOperationException(
+        "$api 需要编译器插件在调用点改写为存储 key，当前调用未被改写。" +
+            "请检查 persist-plugin 的 -Xplugin 接线，或改用 reset(\"key\") / reset { } 字符串形式"
+    )
+
     // ---- 内部机制：仅供同模块的后端函数（PersistedBackend）与委托使用，公开面只保留生命周期 API ----
 
     @Suppress("UNCHECKED_CAST")
     internal fun <T> stateFor(key: String, default: T): MutableState<T> {
         requireAttached()
         synchronized(states) {
-            defaults.putIfAbsent(key, default)
             val existing = states[key]
-            if (existing != null) return existing as MutableState<T>
-            val initial = lastPrefs?.let { readFromPrefs(it, key, default) } ?: default
-            val state = mutableStateOf(initial)
-            states[key] = state as MutableState<Any?>
-            return state
+            if (existing != null) {
+                // getter 路径：default 是编译期内联的字面量；同 key 出现两个不同默认值即撞 key
+                val registered = defaults[key]
+                if (registered === unsetDefault) defaults[key] = default else checkDefault(key, default)
+                return existing as MutableState<T>
+            }
+            return createState(key, default, comparable = true)
         }
     }
 
     internal fun <T> write(key: String, value: T) {
         requireSupportedType(value)
-        // 先更新内存（即时重组），再异步落盘
-        stateFor(key, value).value = value
+        // write 不参与默认值比对：seed 仅用于首次创建，避免把"新值"误当默认值引发误报
+        val st = synchronized(states) {
+            states[key] as? MutableState<T> ?: createState(key, value, comparable = false)
+        }
+        st.value = value
         launchDiskWrite { prefs ->
             when (value) {
                 is Int -> prefs[intPreferencesKey(key)] = value
@@ -172,6 +205,22 @@ object PersistedStore {
     }
 
     // ---- 私有实现 ----
+
+    @Suppress("UNCHECKED_CAST")
+    private fun <T> createState(key: String, seed: T, comparable: Boolean): MutableState<T> {
+        defaults.putIfAbsent(key, if (comparable) seed else unsetDefault)
+        val initial = lastPrefs?.let { readFromPrefs(it, key, seed) } ?: seed
+        val state = mutableStateOf(initial)
+        states[key] = state as MutableState<Any?>
+        return state
+    }
+
+    private fun checkDefault(key: String, default: Any?) {
+        val registered = defaults[key]
+        if (registered != null && registered != default) {
+            throw PersistedKeyConflictException(key, registered, default)
+        }
+    }
 
     private fun launchDiskWrite(block: (androidx.datastore.preferences.core.MutablePreferences) -> Unit) {
         val s = store ?: failNotAttached()

@@ -33,3 +33,15 @@ fun persistedGetString(key: String, default: String): String = PersistedStore.st
 fun persistedSetString(key: String, value: String) {
     PersistedStore.write(key, value)
 }
+
+// ---- reset 调用点重写的落地目标（PersistedStore.reset/resetScope 的引用重载由插件改写到这两个函数） ----
+
+/** 由编译器插件调用点重写生成，等价 PersistedStore.reset(key)；一般勿直接调用 */
+fun resetKey(key: String) {
+    PersistedStore.reset(key)
+}
+
+/** 由编译器插件调用点重写生成；重置以 scope 为前缀的全部 key。一般勿直接调用 */
+fun resetScopeKey(scope: String) {
+    PersistedStore.reset { it.startsWith("$scope-") }
+}
