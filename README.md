@@ -1,5 +1,7 @@
 # DataStoreExtensions
 
+[![](https://jitpack.io/v/LiJoeAllen/DataStoreExtensions.svg)](https://jitpack.io/#LiJoeAllen/DataStoreExtensions)
+
 Android Compose 项目，用 **Jetpack DataStore（Preferences）** 实现 `@Persisted` 注解持久化属性：
 声明一个属性即自动获得「读写持久化 + Compose 重组」能力。
 
