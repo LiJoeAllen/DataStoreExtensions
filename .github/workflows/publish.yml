@@ -1,11 +1,11 @@
-name: Publish datastore-extensions
+name: Publish library modules
 
-# 发布 datastore-extensions（common 模块）到 GitHub Packages：
+# 发布两个库模块（datastore-extensions + persist-plugin）到 GitHub Packages：
 # https://docs.github.com/zh/actions/tutorials/publish-packages/publish-java-packages-with-gradle
 #
 # 触发方式（二选一）：
-# 1. 在 GitHub 上发布 Release（tag 名即版本号，如 0.1.0 或 v0.1.0，v 前缀会被去掉）
-# 2. 手动触发（workflow_dispatch），可输入 version；两者都缺省时用 build 脚本里的 0.1.0
+# 1. 在 GitHub 上发布 Release（tag 名即版本号，如 0.2.0 或 v0.2.0，v 前缀会被去掉）
+# 2. 手动触发（workflow_dispatch），可输入 version；两者都缺省时用 build 脚本里的 0.2.0
 on:
   release:
     types: [published]
@@ -43,4 +43,4 @@ jobs:
           if [ -n "$V" ]; then
             export ORG_GRADLE_PROJECT_version="$V"
           fi
-          ./gradlew :datastore-extensions:publishAllPublicationsToGitHubPackagesRepository
+          ./gradlew :datastore-extensions:publishAllPublicationsToGitHubPackagesRepository :persist-plugin:publishAllPublicationsToGitHubPackagesRepository

@@ -1,4 +1,6 @@
 pluginManagement {
+    // convention plugins（编译器插件接线 / Maven 发布），included build 隔离类路径
+    includeBuild("build-logic")
     repositories {
         // 国内镜像（阿里云），官方源作兜底
         maven("https://maven.aliyun.com/repository/gradle-plugin")
@@ -18,8 +20,9 @@ dependencyResolutionManagement {
     repositories {
         // JitPack：app 消费正式发布产物（匿名，无需凭据）
         maven("https://jitpack.io")
-        // 本地开发如需覆盖远程产物，解开下一行并 publishToMavenLocal 同坐标
-        // mavenLocal()
+        // app 平时以 project(":datastore-extensions") 消费仓库内模块（默认），
+        // 发布验证时以 -PconsumeRemote 切到 JitPack 坐标，不走 mavenLocal
+        // 不走仓库坐标，无需 mavenLocal
         // GitHub Packages 备用渠道；需认证（PAT 勾选 read:packages）：
         //   GITHUB_ACTOR=LiJoeAllen  GITHUB_TOKEN=<PAT>
         // 未设置时匿名访问被 401 跳过

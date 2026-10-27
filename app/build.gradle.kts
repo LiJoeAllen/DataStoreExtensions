@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    id("persist.compiler-plugin-wiring")
 }
 
 android {
@@ -21,26 +22,20 @@ android {
     }
 }
 
+// 默认消费仓库内模块（日常开发 / AS 同步开箱即用）；
+// -PconsumeRemote 时消费 JitPack 发布产物，作为发布前的真实消费验证（须版本已发布）
+val consumeRemote = providers.gradleProperty("consumeRemote").isPresent
+
 dependencies {
-    // 以 Maven 坐标消费本仓库发布的库（发布验证）：
-    // 先 ./gradlew :datastore-extensions:publishToMavenLocal，再构建 app
-    implementation(libs.datastore.extensions)
+    if (consumeRemote) {
+        implementation(libs.datastore.extensions)
+    } else {
+        implementation(project(":datastore-extensions"))
+    }
 
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
     implementation(libs.compose.material3)
     implementation(libs.activity.compose)
     implementation(libs.datastore.preferences)
-}
-
-// ---- @K compiler plugin wiring (local module) ----
-// 路径从 jar 任务的实际输出生成（版本号会影响 jar 文件名，勿硬编码 libs/<name>.jar）；
-// 在 configureEach 内懒解析，此时 persist-plugin 的任务已注册
-val pluginProject = project(":persist-plugin")
-tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
-    val jarTask = pluginProject.tasks.named<Jar>("jar")
-    dependsOn(jarTask)
-    compilerOptions.freeCompilerArgs.add(
-        jarTask.map { "-Xplugin=${it.archiveFile.get().asFile.absolutePath}" }
-    )
 }
