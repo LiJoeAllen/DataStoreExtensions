@@ -35,18 +35,21 @@ import org.jetbrains.kotlin.ir.types.isBoolean
 import org.jetbrains.kotlin.ir.types.isFloat
 import org.jetbrains.kotlin.ir.types.isInt
 import org.jetbrains.kotlin.ir.types.isLong
-import org.jetbrains.kotlin.ir.types.isString 
+import org.jetbrains.kotlin.ir.types.isString
 import org.jetbrains.kotlin.name.CallableId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
 
 const val PLUGIN_ID = "io.github.lijoeallen.datastoreextensions.persist"
 
-private const val ANNOTATION_FQ_NAME = "io.github.lijoeallen.datastoreextensions.K"
+private const val ANNOTATION_FQ_NAME = "io.github.lijoeallen.datastoreextensions.Persisted"
 private const val BACKEND_PACKAGE = "io.github.lijoeallen.datastoreextensions"
 
-// key 前后缀之间的分隔符（存储契约的一部分，与库文档一致）
+// key 段之间的分隔符（存储契约的一部分，与库文档一致）
 private const val KEY_SEPARATOR = "-"
+
+// 注解参数名（与 Persisted.kt 的 annotation class Persisted(key) 一一对应）
+private const val PARAM_KEY = "key"
 
 // 库的后端函数命名（与 Persisted.kt 中的函数一一对应，勿改名）
 private const val GETTER_FN_PREFIX = "persistedGet"
@@ -79,15 +82,17 @@ class PersistPluginRegistrar : CompilerPluginRegistrar() {
 }
 
 /**
- * IR 阶段重写 @K 属性的访问器：
+ * IR 阶段重写 @Persisted 属性的访问器：
  *   getter → return persistedGet<Type>("<key>", <默认值>)
  *   setter → persistedSet<Type>("<key>", value)
  *
- * key = [前缀-]后缀：
- *   - 后缀 = 属性 @K 的 k（缺省为属性名）
- *   - 前缀 = 所在 @K object 的 k（缺省为对象简单名）；顶层属性无前缀
+ * key = 各层 key 段以 "-" 连接（多级作用域逐层追加）：
+ *   - 属性段 = 属性 @Persisted 的 key（缺省为属性名）
+ *   - 对象段 = 对象 @Persisted 的 key（缺省为对象简单名），嵌套时拼接外层作用域
  *
- * @K object 内所有 var 自动纳入；普通类内仅处理带 @K 的成员。
+ * @Persisted object 是持久化作用域：作用域内所有 var 与嵌套对象自动纳入；
+ * 作用域外（顶层/普通类）仅带 @Persisted 的成员持久化（无作用域前缀）。
+ *
  * 两种声明写法均重写：`var abc = 100`（默认值取 backing field）、
  * `var xyz by persisted(1)`（默认值取 persisted(字面量) 参数）；
  * 非 persisted() 的自定义委托保持运行时委托语义，不动。
@@ -96,53 +101,78 @@ class PersistIrGenerationExtension : IrGenerationExtension {
 
     override fun generate(moduleFragment: IrModuleFragment, pluginContext: IrPluginContext) {
         moduleFragment.files.forEach { file ->
-            file.declarations.filterIsInstance<IrProperty>().forEach { property ->
-                if (hasK(property)) transform(property, pluginContext, prefix = null)
-            }
-            file.declarations.filterIsInstance<IrClass>().forEach { irClass ->
-                val prefix = classPrefix(irClass)
-                irClass.declarations.filterIsInstance<IrProperty>().forEach { property ->
-                    when {
-                        // @K object：全部成员自动持久化（带前缀）
-                        prefix != null -> transform(property, pluginContext, prefix)
-                        // 普通类：仅处理带 @K 的成员（无前缀）
-                        hasK(property) -> transform(property, pluginContext, null)
-                    }
+            file.declarations.forEach { declaration ->
+                when (declaration) {
+                    is IrProperty -> if (hasPersisted(declaration)) transform(declaration, pluginContext, scope = null)
+                    is IrClass -> processClass(declaration, pluginContext, parentScope = null)
+                    else -> Unit
                 }
             }
         }
     }
 
-    private fun hasK(property: IrProperty): Boolean =
-        property.annotations.any { it.isKAnnotation() }
-
-    /** @K object 的前缀：k 参数缺省时用对象简单名；非 @K 类返回 null */
-    private fun classPrefix(irClass: IrClass): String? {
-        val annotation = irClass.annotations.firstOrNull { it.isKAnnotation() } ?: return null
-        return annotation.kValue() ?: irClass.name.asString()
+    /** 递归处理类及其嵌套类：scope != null 表示处于持久化作用域内（全部成员自动纳入） */
+    private fun processClass(irClass: IrClass, context: IrPluginContext, parentScope: String?) {
+        val scope = scopeSegment(irClass, parentScope)
+        irClass.declarations.forEach { declaration ->
+            when (declaration) {
+                is IrProperty -> when {
+                    scope != null -> transform(declaration, context, scope)
+                    hasPersisted(declaration) -> transform(declaration, context, null)
+                }
+                is IrClass -> processClass(declaration, context, scope)
+                else -> Unit
+            }
+        }
     }
 
-    private fun IrConstructorCall.isKAnnotation(): Boolean =
+    private fun hasPersisted(property: IrProperty): Boolean =
+        property.annotations.any { it.isPersistedAnnotation() }
+
+    /**
+     * 类的 key 段：作用域内（parentScope != null）自动纳入，段 = 注解 key（缺省简单名）叠加外层；
+     * 作用域外仅 @Persisted 类开新作用域，段 = key（缺省简单名）；非 @Persisted 类返回 null
+     */
+    private fun scopeSegment(irClass: IrClass, parentScope: String?): String? {
+        val annotation = irClass.annotations.firstOrNull { it.isPersistedAnnotation() }
+        if (parentScope != null) {
+            val own = annotation?.paramValue(PARAM_KEY)?.takeIf { it.isNotEmpty() }
+                ?: irClass.name.asString()
+            return "$parentScope$KEY_SEPARATOR$own"
+        }
+        if (annotation != null) {
+            return annotation.paramValue(PARAM_KEY)?.takeIf { it.isNotEmpty() }
+                ?: irClass.name.asString()
+        }
+        return null
+    }
+
+    private fun IrConstructorCall.isPersistedAnnotation(): Boolean =
         type.classFqName?.asString() == ANNOTATION_FQ_NAME
 
-    /** 注解的 k 参数；缺省/空串视为未指定 */
-    private fun IrConstructorCall.kValue(): String? =
-        ((arguments.firstOrNull() as? IrConst)?.value as? String)?.takeIf { it.isNotEmpty() }
+    /** 注解参数值（按参数名取）；参数不存在或空串视为未指定 */
+    private fun IrConstructorCall.paramValue(paramName: String): String? {
+        // 注解构造器无 receiver 参数，parameters 即全部值参数，索引与 arguments 对齐
+        val index = symbol.owner.parameters.indexOfFirst { it.name.asString() == paramName }
+        if (index < 0) return null
+        return (arguments.getOrNull(index) as? IrConst)?.value as? String
+    }
 
-    private fun transform(property: IrProperty, context: IrPluginContext, prefix: String?) {
+    private fun transform(property: IrProperty, context: IrPluginContext, scope: String?) {
         val getter = property.getter ?: return
         val name = property.name.asString()
         val start = property.startOffset
         val end = property.endOffset
 
-        // key = [前缀-]后缀
-        val suffix = property.annotations.firstOrNull { it.isKAnnotation() }?.kValue() ?: name
-        val key = prefix?.let { "$it$KEY_SEPARATOR$suffix" } ?: suffix
+        // key = 各层 key 段拼接：作用域段（可多层）+ 属性段
+        val annotation = property.annotations.firstOrNull { it.isPersistedAnnotation() }
+        val segment = annotation?.paramValue(PARAM_KEY)?.takeIf { it.isNotEmpty() } ?: name
+        val key = scope?.let { "$it$KEY_SEPARATOR$segment" } ?: segment
 
         val typeSuffix = typeSuffix(getter.returnType, context, name) ?: return
         val getFun = context.findBackendFunction(GETTER_FN_PREFIX + typeSuffix)
         if (getFun == null) {
-            context.reportError("[@K] 找不到后端函数 $GETTER_FN_PREFIX$typeSuffix（属性 '$name'）")
+            context.reportError("[@Persisted] 找不到后端函数 $GETTER_FN_PREFIX$typeSuffix（属性 '$name'）")
             return
         }
 
@@ -172,7 +202,7 @@ class PersistIrGenerationExtension : IrGenerationExtension {
         val setter = property.setter ?: return
         val setFun = context.findBackendFunction(SETTER_FN_PREFIX + typeSuffix)
         if (setFun == null) {
-            context.reportError("[@K] 找不到后端函数 $SETTER_FN_PREFIX$typeSuffix（属性 '$name'）")
+            context.reportError("[@Persisted] 找不到后端函数 $SETTER_FN_PREFIX$typeSuffix（属性 '$name'）")
             return
         }
         val setBuilder = IrSingleStatementBuilder(context, Scope(setter.symbol), start, end, IrStatementOrigin.INVOKE)
@@ -199,7 +229,7 @@ class PersistIrGenerationExtension : IrGenerationExtension {
         val arg = initCall.arguments.filterNotNull().firstOrNull() as? IrConst
         if (arg == null) {
             context.reportError(
-                "[@K] 委托写法的默认值仅支持字面量（属性 '$name'），或改用纯注解写法 `var $name = <默认值>`"
+                "[@Persisted] 委托写法的默认值仅支持字面量（属性 '$name'），或改用纯注解写法 `var $name = <默认值>`"
             )
             return null
         }
@@ -231,7 +261,7 @@ class PersistIrGenerationExtension : IrGenerationExtension {
         type.isBoolean() -> Boolean::class.simpleName
         type.isString() -> String::class.simpleName
         else -> {
-            context.reportError("[@K] 不支持的属性类型 '$name'：仅支持 Int/Long/Float/Boolean/String")
+            context.reportError("[@Persisted] 不支持的属性类型 '$name'：仅支持 Int/Long/Float/Boolean/String")
             null
         }
     }

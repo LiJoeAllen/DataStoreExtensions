@@ -25,15 +25,19 @@ fun AppUi() {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(ItemSpacing),
         ) {
-            // 方式一：委托 + 自定义后缀（key = demo-xyz1）
+            // 委托语法 + 自定义后缀（key = demo-xyz1）
             Button(onClick = { DemoState.xyz++ }) {
                 Text("xyz: ${DemoState.xyz}")
             }
-            // 方式二：纯注解，未标注自动纳入（key = demo-abc，属性名作后缀）
+            // 纯注解语法，未标注自动纳入（key = demo-abc，属性名作末段）
             Button(onClick = { DemoState.abc++ }) {
                 Text("abc: ${DemoState.abc}")
             }
-            // k 为空的对象：前缀回退对象名（key = Counter-count）
+            // 嵌套作用域：段逐层追加（key = demo-Audio-volume）
+            Button(onClick = { DemoState.Audio.volume += 2 }) {
+                Text("volume: ${DemoState.Audio.volume}")
+            }
+            // prefix 缺省的对象：前缀回退对象名（key = Counter-count）
             Button(onClick = { Counter.count++ }) {
                 Text("count: ${Counter.count}")
             }

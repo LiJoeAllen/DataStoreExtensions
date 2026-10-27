@@ -48,14 +48,16 @@ object PersistedStore {
 
     /** 等待首批磁盘数据加载完成（App.onCreate 调用一次） */
     suspend fun awaitFirstLoad() {
-        val s = store ?: return
+        val s = store ?: failNotAttached()
         val prefs = s.data.first()
         lastPrefs = prefs
         applyPrefs(prefs)
     }
 
+    // 内部机制：仅供同模块的后端函数（PersistedBackend）与委托使用，公开面只保留 attach/awaitFirstLoad
     @Suppress("UNCHECKED_CAST")
-    fun <T> stateFor(key: String, default: T): MutableState<T> {
+    internal fun <T> stateFor(key: String, default: T): MutableState<T> {
+        requireAttached()
         synchronized(states) {
             val existing = states[key]
             if (existing != null) return existing as MutableState<T>
@@ -66,11 +68,12 @@ object PersistedStore {
         }
     }
 
-    fun <T> write(key: String, value: T) {
+    internal fun <T> write(key: String, value: T) {
+        requireSupportedType(value)
         // 先更新内存（即时重组），再异步落盘
         stateFor(key, value).value = value
-        val s = store ?: return
-        val sc = scope ?: return
+        val s = store ?: failNotAttached()
+        val sc = scope ?: failNotAttached()
         sc.launch {
             s.edit { prefs ->
                 when (value) {
@@ -79,9 +82,25 @@ object PersistedStore {
                     is Float -> prefs[floatPreferencesKey(key)] = value
                     is Boolean -> prefs[booleanPreferencesKey(key)] = value
                     is String -> prefs[stringPreferencesKey(key)] = value
-                    else -> Unit
                 }
             }
+        }
+    }
+
+    private fun requireAttached() {
+        if (store == null) failNotAttached()
+    }
+
+    private fun failNotAttached(): Nothing = throw IllegalStateException(
+        "PersistedStore 未初始化：请先在 Application.onCreate 调用 attach(dataStore, scope)，" +
+            "再访问 @Persisted 属性"
+    )
+
+    private fun requireSupportedType(value: Any?) {
+        require(
+            value is Int || value is Long || value is Float || value is Boolean || value is String
+        ) {
+            "仅支持 Int/Long/Float/Boolean/String 的持久化，收到 ${value?.javaClass?.name ?: "null"}（key 未落盘）"
         }
     }
 
