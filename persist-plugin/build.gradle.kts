@@ -7,6 +7,9 @@ plugins {
 dependencies {
     // matches the Kotlin compiler shipped with the Kotlin Gradle plugin
     compileOnly(libs.kotlin.compiler.embeddable)
+    // 编译器插件运行在 Kotlin 编译器内，stdlib 由编译器提供；
+    // compileOnly 只补编译类路径，不进入发布 POM。
+    compileOnly(libs.kotlin.stdlib)
 }
 
 kotlin {
