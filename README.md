@@ -32,8 +32,11 @@ object DemoState {
 
 ```kotlin
 repositories { maven("https://jitpack.io") }
-implementation("com.github.LiJoeAllen:DataStoreExtensions:0.3.0")
+implementation("com.github.LiJoeAllen:DataStoreExtensions:0.3.1")
 ```
+
+> 运行时 AAR 不强制 `kotlin-stdlib` 版本，由消费方 Kotlin 插件统一提供；
+> POM 不会把构建用 stdlib 版本带给 Kotlin 2.3.x 项目。
 
 ### 2. 接入编译器插件
 
@@ -45,9 +48,9 @@ implementation("com.github.LiJoeAllen:DataStoreExtensions:0.3.0")
 // build.gradle.kts
 val persistPlugin = configurations.create("persistPlugin") { isTransitive = false }
 dependencies {
-    persistPlugin("com.github.LiJoeAllen.DataStoreExtensions:persist-plugin:0.3.0")
+    persistPlugin("com.github.LiJoeAllen.DataStoreExtensions:persist-plugin:0.3.1")
     // Kotlin 2.3.x 项目请用变体 tag：
-    // persistPlugin("com.github.LiJoeAllen.DataStoreExtensions:persist-plugin:0.3.0-k2.3.21")
+    // persistPlugin("com.github.LiJoeAllen.DataStoreExtensions:persist-plugin:0.3.1-k2.3.21")
 }
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
     compilerOptions.freeCompilerArgs.add(
@@ -185,15 +188,15 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
 
 ## 发布
 
-发布渠道只有 **JitPack**：**在 GitHub 创建 Release**（tag 名即版本号，如 `0.3.0`）即可，
+发布渠道只有 **JitPack**：**在 GitHub 创建 Release**（tag 名即版本号，如 `0.3.1`）即可，
 无需任何 CI 配置——JitPack 在首次请求该版本时自动构建（见 `jitpack.yml`：
 双模块 publishToMavenLocal，版本取 tag）。版本不可变，重新发布需换版本号。
 
 消费坐标（匿名）：
 
 ```kotlin
-implementation("com.github.LiJoeAllen:DataStoreExtensions:0.3.0")                      // AAR
-classpath / 配置依赖("com.github.LiJoeAllen.DataStoreExtensions:persist-plugin:0.3.0") // 插件（多模块坐标）
+implementation("com.github.LiJoeAllen:DataStoreExtensions:0.3.1")                      // AAR
+classpath / 配置依赖("com.github.LiJoeAllen.DataStoreExtensions:persist-plugin:0.3.1") // 插件（多模块坐标）
 ```
 
 ### 插件与 Kotlin 版本兼容表
@@ -202,8 +205,8 @@ classpath / 配置依赖("com.github.LiJoeAllen.DataStoreExtensions:persist-plug
 
 | tag | 构建用 Kotlin | 适用项目 Kotlin |
 |---|---|---|
-| `0.3.0` | 2.4.21 | 2.4.x |
-| `0.3.0-k2.3.21` | 2.3.21 | 2.3.x |
+| `0.3.1` | 2.4.21 | 2.4.x |
+| `0.3.1-k2.3.21` | 2.3.21 | 2.3.x |
 
 ## 修改插件后
 

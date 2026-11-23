@@ -7,7 +7,7 @@ import com.vanniktech.maven.publish.MavenPublishBaseExtension
  * 自己的 coordinates 与 pom name/description。
  */
 group = "io.github.lijoeallen"
-version = providers.gradleProperty("version").getOrElse("0.3.0")
+version = providers.gradleProperty("version").getOrElse("0.3.1")
 
 extensions.configure<MavenPublishBaseExtension> {
     pom {
